@@ -1,7 +1,7 @@
 """
 Generative Adversarial Imitation Learning (GAIL, Ho & Ermon 2016) in miniature.
 
-Task: goal-conditioned 2-D reaching. Observation o = (x, y, gx, gy); action = velocity in
+Task: goal-conditioned 2-D reaching. Observation o = (x, y, gx-x, gy-y); action = velocity in
 [-1,1]^2.  The learner NEVER sees the true reward; it only gets 20 expert demonstrations.
 
   * Discriminator D(s,a) is trained to tell expert (s,a) pairs from policy pairs.
@@ -38,7 +38,8 @@ class ReachEnv:
         return self.obs()
 
     def obs(self):
-        return np.concatenate([self.pos, self.goal], 1).astype(np.float32)
+        # position + goal offset (relative coordinates make the problem easier for both D and pi)
+        return np.concatenate([self.pos, self.goal - self.pos], 1).astype(np.float32)
 
     def step(self, a):
         self.pos = np.clip(self.pos + STEP * np.clip(a, -1, 1), 0, 1)
@@ -48,7 +49,7 @@ class ReachEnv:
 
 
 def expert_policy(o):
-    d = o[:, 2:] - o[:, :2]
+    d = o[:, 2:]                     # goal offset
     dist = np.linalg.norm(d, axis=1, keepdims=True) + 1e-8
     return d / dist * np.minimum(1.0, dist / STEP)  # full speed, then slow down exactly onto goal
 
@@ -122,10 +123,10 @@ def gae(rew, val, last_val, gamma=0.99, lam=0.95):
     return adv, adv + val
 
 
-def train_gail(s_exp, a_exp, iters=120):
+def train_gail(s_exp, a_exp, iters=300):
     pi, D = Policy(), mlp(6, 1)
-    opt_pi = torch.optim.Adam(pi.parameters(), lr=3e-4)
-    opt_d = torch.optim.Adam(D.parameters(), lr=3e-4)
+    opt_pi = torch.optim.Adam(pi.parameters(), lr=1e-3)
+    opt_d = torch.optim.Adam(D.parameters(), lr=1e-3)
     env = ReachEnv(N_ENVS)
     for it in range(iters):
         O, A, LP, V = [], [], [], []
@@ -149,7 +150,7 @@ def train_gail(s_exp, a_exp, iters=120):
             last_v = pi.v(torch.tensor(o)).squeeze(-1)
         adv, ret = gae(R, V, last_v)
         ppo_update(pi, opt_pi, flatO, flatA, LP.reshape(-1), adv.reshape(-1), ret.reshape(-1))
-        if it % 30 == 0 or it == iters - 1:
+        if it % 50 == 0 or it == iters - 1:
             print(f"  iter {it:3d}  D loss {ld.item():.3f}   mean GAIL reward {R.mean():.3f}   "
                   f"true final dist {evaluate(lambda x: pi.mu(torch.tensor(x)).detach().numpy())[1]:.3f}")
     return pi

@@ -149,8 +149,11 @@ def lambda_returns(rewards, values, gamma=0.95, lam=0.95):
     return torch.stack(out[::-1])           # (H, N): returns for states 0..H-1
 
 
-def imagine_and_learn(wm, actor, critic, critic_t, opt_actor, opt_critic, start, horizon=15, ent_coef=1e-3):
-    h, z = [x.reshape(-1, x.shape[-1]) for x in start]       # every posterior state is a dream start
+def imagine_and_learn(wm, actor, critic, critic_t, opt_actor, opt_critic, start, horizon=12, ent_coef=1e-3,
+                      n_starts=256):
+    h, z = [x.reshape(-1, x.shape[-1]) for x in start]       # posterior states become dream starts
+    idx = torch.randperm(h.shape[0])[:n_starts]              # (subsampled to keep the CPU demo fast)
+    h, z = h[idx], z[idx]
     feats, rews = [torch.cat([h, z], -1)], []
     for _ in range(horizon):
         a, _ = actor(feats[-1])
@@ -213,7 +216,7 @@ def sample_batch(episodes, B=32, L=20):
     return [torch.as_tensor(np.array(x)) for x in (o, a, r)]
 
 
-def main(seed_episodes=5, train_episodes=25, updates_per_episode=40):
+def main(seed_episodes=5, train_episodes=15, updates_per_episode=30):
     env = PointMass(0)
     wm, actor = RSSM(env.obs_dim, env.act_dim), Actor(env.act_dim)
     critic = mlp(H_DIM + Z_DIM, 1)
@@ -249,7 +252,7 @@ def main(seed_episodes=5, train_episodes=25, updates_per_episode=40):
                 critic_t.load_state_dict(critic.state_dict())
         ep, ret = run_episode(env, wm, actor, mode="explore")
         episodes.append(ep)
-        if ep_i % 5 == 0:
+        if ep_i % 3 == 0:
             print(f"episode {ep_i:3d} | real return {ret:7.1f} | recon {info['recon']:.4f} rew-err {info['rew']:.4f} "
                   f"KL {info['kl']:.2f} | mean dreamed reward {dream_r:6.3f} | {time.time() - t0:5.1f}s")
     eval_ret = np.mean([run_episode(env, wm, actor, mode="eval")[1] for _ in range(10)])

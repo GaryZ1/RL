@@ -140,7 +140,7 @@ def evaluate(agent, n_episodes=10, seed=123):
 
 
 def train(total_steps=100_000, n_envs=8, n_steps=128, n_epochs=4, n_minibatches=4,
-          lr=2.5e-4, gamma=0.99, lam=0.95, clip_coef=0.2, ent_coef=0.01, vf_coef=0.5,
+          lr=1e-3, gamma=0.99, lam=0.95, clip_coef=0.2, ent_coef=0.01, vf_coef=0.5,
           max_grad_norm=0.5, target_kl=None, seed=0):
     torch.manual_seed(seed); np.random.seed(seed)
     envs, agent = VecCartPole(n_envs, seed=seed), ActorCritic()

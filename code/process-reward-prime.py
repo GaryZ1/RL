@@ -293,11 +293,13 @@ if __name__ == "__main__":
           f"target reachable {tok_r[keeping].mean():+.4f} vs. steps that break it {tok_r[breaking].mean():+.4f}")
 
     # --- short RL comparison
-    print("\nRL from the base policy, mean of 2 seeds (train accuracy, last 10 iterations):")
+    print("\nRL from the base policy, mean of 2 seeds (train accuracy):")
+    # Honest finding on this toy: the outcome reward (K=6 steps, G=8) is already informative, and the
+    # online implicit PRM is noisy, so adding its dense rewards does not help and a large weight hurts.
     runs = {"outcome-only RLOO": dict(mode="outcome"),
-            "PRIME-style, phi from ref, proc_coef 0.2": dict(mode="prime"),
-            "PRIME-style, warmed-up phi, proc_coef 0.2": dict(mode="prime", phi_init=phi),
-            "PRIME-style, warmed-up phi, proc_coef 1.0": dict(mode="prime", phi_init=phi, proc_coef=1.0)}
+            "PRIME-style, proc_coef 0.05": dict(mode="prime", proc_coef=0.05),
+            "PRIME-style, proc_coef 0.2": dict(mode="prime", proc_coef=0.2),
+            "PRIME-style, warmed-up phi, proc_coef 0.2": dict(mode="prime", phi_init=phi)}
     for name, kw in runs.items():
         curves = [rl(base, seed=s, **kw) for s in range(2)]
         print(f"  {name:44s} first10 {sum(sum(c[:10]) / 10 for c in curves) / 2:.3f} | "

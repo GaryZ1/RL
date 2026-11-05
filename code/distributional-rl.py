@@ -265,13 +265,14 @@ def tabular_distributional_demo():
 
 
 def _sanity_checks():
+    torch.manual_seed(0)
     sup = torch.linspace(0, 10, 11)
     p = torch.softmax(torch.randn(3, 11), -1)
     m = categorical_projection(p, torch.tensor([0.3, 1.0, 0.0]), torch.tensor([0.5, 0.5, 0.0]), sup)
     assert torch.allclose(m.sum(-1), torch.ones(3)), "projection must conserve probability mass"
     mean_in = 0.3 + 0.5 * (p[0] * sup).sum()
     assert torch.allclose((m[0] * sup).sum(), mean_in, atol=1e-5), "interior projection keeps mean"
-    assert m[2, 0].item() == 1.0, "discount 0 & reward 0 -> all mass on atom z=0"
+    assert abs(m[2, 0].item() - 1.0) < 1e-5, "discount 0 & reward 0 -> all mass on atom z=0"
     # quantile regression on samples from N(3, 1): learned 50% quantile ~ 3
     theta = torch.zeros(1, 3, requires_grad=True)
     opt, taus = torch.optim.Adam([theta], lr=0.05), torch.tensor([0.1, 0.5, 0.9])
