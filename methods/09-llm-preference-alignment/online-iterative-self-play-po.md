@@ -107,7 +107,7 @@ where $\hat P(y\succ\pi_t)$ is estimated by comparing $y$ against other samples 
 
 ## 6. Python implementation
 
-Runnable version: [`code/online_iterative_self_play_po.py`](../../code/online_iterative_self_play_po.py)
+Runnable version: [`code/online-iterative-self-play-po.py`](../../code/online-iterative-self-play-po.py)
 
 There are three parts.
 - **Part A** compares offline DPO with 4-round iterative online DPO on a tiny GRU LM, using the *same labelling budget* (2000 prompts, best-vs-worst of 4 samples judged by a noisy toy judge).
@@ -128,7 +128,7 @@ Part B  SPPO on an INTRANSITIVE preference (rock-paper-scissors + a dominated re
 Part C  SPIN: self-play fine-tuning where 'chosen' = human SFT data, 'rejected' = the model's
         own samples; the fixed point is pi = p_data.
 
-Run: python3 code/online_iterative_self_play_po.py     (CPU, ~1 min)
+Run: python3 code/online-iterative-self-play-po.py     (CPU, ~1 min)
 """
 import copy
 import torch

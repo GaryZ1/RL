@@ -16,7 +16,7 @@ Experiment:
   3. DAgger: start from (1), then repeatedly roll out the LEARNER under deployment
      conditions, ask the expert to label every visited state, aggregate, retrain.
 
-Run:  python3 code/behavior_cloning_dagger.py     (about 15-40 s on CPU)
+Run:  python3 code/behavior-cloning-dagger.py     (about 15-40 s on CPU)
 """
 import numpy as np
 import torch

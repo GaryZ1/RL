@@ -7,7 +7,7 @@ Compares
     (each room has two options: "go to hallway A" / "go to hallway B").
 Pure NumPy, runs in seconds.
 
-Run:  python3 code/hierarchical_rl.py
+Run:  python3 code/hierarchical-rl.py
 """
 from collections import deque
 

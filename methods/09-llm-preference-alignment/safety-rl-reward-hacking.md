@@ -115,7 +115,7 @@ $$r_{\text{total}}=r_{\text{RM}}+r_{\text{RBR}}.$$
 
 ## 6. Python implementation
 
-Runnable version: [`code/safety_rl_reward_hacking.py`](../../code/safety_rl_reward_hacking.py)
+Runnable version: [`code/safety-rl-reward-hacking.py`](../../code/safety-rl-reward-hacking.py)
 
 **Part A** runs a Safe RLHF-style Lagrangian on a tabular policy. On harmful prompts the harmful answer is "most helpful" to the reward model, so reward-only RL produces harm. A fixed penalty and a self-tuning Lagrange multiplier both remove it. **Part B** is a toy coding environment with a flawed grader that also accepts "early exit" programs (tokens 8 and 9, like `sys.exit(0)` before the asserts). It compares: the flawed grader, the flawed grader with a KL penalty, the flawed grader with a monitor that only recognizes token 9, and the fixed grader.
 
@@ -138,7 +138,7 @@ Part B -- reward hacking in a toy "coding" environment
   Compare: flawed grader | flawed grader + KL | flawed grader + monitor penalty that only
   recognizes token 9 | fixed grader.
 
-Run: python3 code/safety_rl_reward_hacking.py     (CPU, ~15 s)
+Run: python3 code/safety-rl-reward-hacking.py     (CPU, ~15 s)
 """
 import torch
 import torch.nn as nn

@@ -107,7 +107,7 @@ A 30×4 corridor with the only reward (+1) at the far corner and an 80-step limi
 * Intrinsic rewards are **recomputed at replay time**, so familiar states stop paying, which is crucial.
 * Bonus modules: a count table, and ICM and RND implemented as small PyTorch networks on a one-hot observation.
 
-Runnable version: [`code/curiosity_icm_rnd.py`](../../code/curiosity_icm_rnd.py)
+Runnable version: [`code/curiosity-icm-rnd.py`](../../code/curiosity-icm-rnd.py)
 
 ```python
 """
@@ -127,7 +127,7 @@ The intrinsic reward modules are small PyTorch networks (count-based is a table)
   * ICM         : r_int = 1/2 || f_fwd(phi(s), a) - phi(s') ||^2   (Pathak et al., 2017)
   * RND         : r_int = || f_pred(s') - f_target(s') ||^2        (Burda et al., 2018)
 
-Run:  python3 code/curiosity_icm_rnd.py    (roughly 30-90 s on CPU)
+Run:  python3 code/curiosity-icm-rnd.py    (roughly 30-90 s on CPU)
 """
 import numpy as np
 import torch
@@ -292,6 +292,7 @@ def run(bonus_mod, episodes=250, beta=1.0, eps=0.1, alpha=0.5, gamma=0.98, repla
 if __name__ == "__main__":
     print(f"{LX}x{LY} corridor, reward only at the far corner, horizon {HORIZON}, 250 episodes")
     print(f"{'bonus':<19}{'cells visited':>15}{'first reward (episode)':>24}{'greedy solves':>15}{'steps':>7}")
+    torch.manual_seed(0)                                   # reproducible bonus-network init
     variants = [("none (eps-greedy)", NoBonus(), 0.0),       # beta = 0: Q_int ignored
                 ("optimism only", NoBonus(), 1.0),           # optimistic Q_int, zero bonus
                 ("count", CountBonus(), 1.0),
@@ -315,15 +316,15 @@ bonus                cells visited  first reward (episode)  greedy solves  steps
 none (eps-greedy)              77%                    None             no     80
 optimism only                 100%                      10            yes     32
 count                         100%                      23            yes     32
-ICM                            83%                    None             no     80
-RND                           100%                      23            yes     32
+ICM                            98%                    None             no     80
+RND                           100%                      27            yes     32
 ```
 
 Honest reading:
 
 * **Dithering fails**: ε-greedy never sees the reward in 250 episodes.
-* **Optimism, counts and RND all solve it** and the greedy policy takes the optimal 32-step path. In a tiny table, optimism alone is the fastest; that's the classical result that counts ≈ optimism. RND matches the count bonus, which illustrates that it behaves like a learned count.
-* **ICM fails here.** On this simple deterministic grid, its forward model generalizes across cells ("moving right shifts the x one-hot") and its bonus fades everywhere before the frontier is reached. ICM was designed for high-dimensional observations with distractors, where its inverse-model features matter. Picking the bonus to match the problem matters.
+* **Optimism, counts and RND all solve it** and the greedy policy takes the optimal 32-step path. In a tiny table, optimism alone is the fastest; that's the classical result that counts ≈ optimism. RND performs about as well as the count bonus, which illustrates that it behaves like a learned count.
+* **ICM fails to find the reward here** (it covers most of the corridor but never reaches the rewarded corner within 250 episodes). On this simple deterministic grid its forward model generalizes across cells ("moving right shifts the x one-hot"), so its bonus is weak and fades quickly, giving little directed pressure toward the far end. ICM was designed for high-dimensional observations with distractors, where its inverse-model features matter. Picking the bonus to match the problem matters.
 * During development, two implementation details mattered more than the choice of bonus: (1) storing bonuses in the replay buffer instead of recomputing them made agents loop around the start; (2) a zero-initialized $Q_{\text{int}}$ made all bonuses *anti*-exploratory.
 
 **Link to LLM RL: exploration and entropy collapse.** In RL fine-tuning of LLMs (RLHF, RLVR with GRPO/PPO), "exploration" means sampling diverse reasoning paths. A widely reported failure is **entropy collapse**: token-level policy entropy drops quickly, the model becomes over-confident, samples within a group become near-identical (so group-relative advantages vanish), and improvement plateaus. Mitigations used in practice include asymmetric "clip-higher" ratios (DAPO), entropy or KL-covariance regularization, higher sampling temperature, filtering prompts whose samples are all correct or all wrong, and diversity- or novelty-style bonuses. A related debate concerns whether RLVR mostly *sharpens* the base model's existing distribution (pass@1 rises, while pass@k for large k may not) rather than discovering new strategies. That is exactly the exploration question this page is about. A minimal entropy-monitoring helper as used in such trainers:

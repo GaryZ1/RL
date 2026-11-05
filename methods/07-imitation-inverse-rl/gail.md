@@ -301,7 +301,7 @@ if __name__ == "__main__":
           "(state, action) pairs indistinguishable from the expert's.")
 ```
 
-Example output from our run (CPU, ~25 s):
+Example output from our run (CPU, ~25 s; the last digits can vary slightly between runs/machines):
 
 ```text
 Expert demos: 500 (s,a) pairs from 20 episodes
@@ -318,7 +318,7 @@ Training GAIL ...
 policy                       true return  final dist
 expert                             -1.53       0.000
 random                            -13.66       0.552
-behavior cloning                   -1.52       0.003
+behavior cloning                   -1.47       0.001
 GAIL (PPO + discriminator)         -3.15       0.081
 ```
 

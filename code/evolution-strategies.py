@@ -5,7 +5,7 @@ OpenAI-style Evolution Strategies (Salimans et al., 2017) and CMA-ES (Hansen).
 The policy is a tiny MLP (4 -> 8 -> 1, 49 parameters). None of the methods uses
 gradients of the policy or the environment - only episode returns ("fitness").
 
-Run:  python3 code/evolution_strategies.py     (roughly 10-40 s on CPU)
+Run:  python3 code/evolution-strategies.py     (roughly 10-40 s on CPU)
 """
 import numpy as np
 

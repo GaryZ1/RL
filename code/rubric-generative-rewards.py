@@ -13,7 +13,7 @@ Rubric / generative rewards for non-verifiable tasks + a GRPO-style update.
                 has a checkable answer, rubric-based (generative) reward everywhere.
 * Policy optimization: GRPO-style group-normalized advantages, clipped ratio, k3 KL to ref.
 
-Run: python3 code/rubric_generative_rewards.py    (CPU, ~40 s)
+Run: python3 code/rubric-generative-rewards.py    (CPU, ~40 s)
 """
 import copy
 import torch

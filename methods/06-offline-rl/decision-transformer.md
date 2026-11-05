@@ -107,7 +107,7 @@ Decision Transformer - evaluation (return-conditioned control)
 
 A 6×6 gridworld: start (0,0), goal (5,5), −1 per step, at most 20 steps, so returns lie in [−20, −10] and −10 is optimal. The dataset contains 1,500 trajectories from ε-greedy policies with ε drawn uniformly in [0,1], from near-expert to near-random. A 2-layer, 64-dim causal transformer with context 8 is trained for 1,500 steps, then rolled out with different target returns.
 
-Runnable version: [`code/decision_transformer.py`](../../code/decision_transformer.py)
+Runnable version: [`code/decision-transformer.py`](../../code/decision-transformer.py)
 
 ```python
 """
@@ -122,7 +122,7 @@ Environment: 6x6 grid, start (0,0), goal (5,5), reward -1 per step, max 20 steps
 (so returns are in [-20, -10]; -10 is optimal). The offline dataset mixes
 behavior policies of very different quality (epsilon-greedy with random epsilon).
 
-Run:  python3 code/decision_transformer.py   (roughly 30-90 s on CPU)
+Run:  python3 code/decision-transformer.py   (roughly 30-90 s on CPU)
 """
 import numpy as np
 import torch

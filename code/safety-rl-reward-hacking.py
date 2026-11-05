@@ -16,7 +16,7 @@ Part B -- reward hacking in a toy "coding" environment
   Compare: flawed grader | flawed grader + KL | flawed grader + monitor penalty that only
   recognizes token 9 | fixed grader.
 
-Run: python3 code/safety_rl_reward_hacking.py     (CPU, ~15 s)
+Run: python3 code/safety-rl-reward-hacking.py     (CPU, ~15 s)
 """
 import torch
 import torch.nn as nn

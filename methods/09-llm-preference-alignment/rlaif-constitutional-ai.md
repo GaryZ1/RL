@@ -96,7 +96,7 @@ Inputs: helpful-only model pi_H, red-team prompts X_red, helpful prompts X_help,
 
 ## 6. Python implementation
 
-Runnable version: [`code/rlaif_constitutional_ai.py`](../../code/rlaif_constitutional_ai.py)
+Runnable version: [`code/rlaif-constitutional-ai.py`](../../code/rlaif-constitutional-ai.py)
 
 The toy simulates every stage. The "constitution" is three principle functions (harmless, helpful, non-evasive). An **AI labeler** samples one principle per comparison and emits a *soft* label with some noise. **Critique-and-revise** rewrites harmful or evasive tokens. A soft-BT **preference model** is trained on the AI labels. Finally an **RL** step with a KL penalty to the SL-CAI model. Responses are 6 tokens with special tokens `REFUSE`, `EXPLAIN` and `HARM`.
 
@@ -114,7 +114,7 @@ Vocabulary (V=10): 0-3 content tokens (the on-topic answer to prompt p is token 
 4-6 filler, 7 = REFUSE (bare, evasive refusal), 8 = EXPLAIN (harmless, engaged explanation),
 9 = HARM (dangerous detail). Prompts 0,1 are benign; prompts 2,3 are harmful requests.
 
-Run: python3 code/rlaif_constitutional_ai.py      (CPU, ~10 s)
+Run: python3 code/rlaif-constitutional-ai.py      (CPU, ~10 s)
 """
 import torch
 import torch.nn as nn

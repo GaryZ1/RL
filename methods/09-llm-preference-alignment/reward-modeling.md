@@ -102,7 +102,7 @@ Input: SFT model pi_sft, prompts X, annotators (human or AI)
 
 ## 6. Python implementation
 
-Runnable version: [`code/reward_modeling.py`](../../code/reward_modeling.py)
+Runnable version: [`code/reward-modeling.py`](../../code/reward-modeling.py)
 
 The file implements the BT loss (with optional margin and centring), soft-label BT, the pessimistic ensemble aggregate, and a **Goodhart demo**. The RM is trained on preference data covering short responses (length 3–8). Best-of-$n$ then searches over a policy that can also write longer responses (up to 12), which the true reward penalizes but the RM never saw.
 
@@ -122,7 +122,7 @@ Toy world
 * The reward model (RM) sees token counts + a length one-hot. Lengths 9..16 are never seen
   during training, so the RM must extrapolate there -> classic over-optimization.
 
-Run: python3 code/reward_modeling.py     (CPU, ~15 s)
+Run: python3 code/reward-modeling.py     (CPU, ~15 s)
 """
 import math
 import torch

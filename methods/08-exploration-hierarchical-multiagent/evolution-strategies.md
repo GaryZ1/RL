@@ -109,7 +109,7 @@ CMA-ES: see the update equations in Section 4 (mean, two evolution paths, covari
 
 A vectorized NumPy CartPole (classic physics constants, 500-step limit) and a 49-parameter MLP policy (4 → 8 → 1, `tanh`, push right if output > 0). We implement CEM, OpenAI-ES (mirrored sampling, centered ranks, Adam) and a compact CMA-ES following Hansen's tutorial. All candidates in a generation are evaluated on the same 3 start states (common random numbers), so ranking reflects parameters, not luck.
 
-Runnable version: [`code/evolution_strategies.py`](../../code/evolution_strategies.py)
+Runnable version: [`code/evolution-strategies.py`](../../code/evolution-strategies.py)
 
 ```python
 """
@@ -119,7 +119,7 @@ OpenAI-style Evolution Strategies (Salimans et al., 2017) and CMA-ES (Hansen).
 The policy is a tiny MLP (4 -> 8 -> 1, 49 parameters). None of the methods uses
 gradients of the policy or the environment - only episode returns ("fitness").
 
-Run:  python3 code/evolution_strategies.py     (roughly 10-40 s on CPU)
+Run:  python3 code/evolution-strategies.py     (roughly 10-40 s on CPU)
 """
 import numpy as np
 

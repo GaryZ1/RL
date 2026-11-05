@@ -17,7 +17,7 @@ Part B (competitive, self-play, NumPy):
   fictitious play (best-respond to the AVERAGE of past selves, the idea behind leagues and
   PSRO-style population training) converges in average strategy to the Nash equilibrium.
 
-Run:  python3 code/multi_agent_rl.py     (about 20-60 s on CPU)
+Run:  python3 code/multi-agent-rl.py     (about 20-60 s on CPU)
 """
 import numpy as np
 import torch

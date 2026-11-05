@@ -11,7 +11,7 @@ Toy task: unconditional generation of variable-length sequences (EOS-terminated,
   Simulated annotators are BIASED toward longer answers and 20% of labels are flipped.
   So a good method should raise quality WITHOUT simply inflating length.
 
-Run: python3 code/dpo_variants.py     (CPU, ~1 min)
+Run: python3 code/dpo-variants.py     (CPU, ~1 min)
 """
 import copy
 import torch

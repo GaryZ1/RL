@@ -10,7 +10,7 @@ trajectories. MaxEnt IRL recovers w by matching expected feature counts.
 Then we plan with the recovered reward on a NEW map B, which behavior cloning cannot
 transfer to (the states are different), but a reward over features can.
 
-Run:  python3 code/inverse_rl.py     (a few seconds)
+Run:  python3 code/inverse-rl.py     (a few seconds)
 """
 import numpy as np
 

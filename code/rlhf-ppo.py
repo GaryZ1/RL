@@ -2,7 +2,7 @@
 RLHF with PPO (InstructGPT-style) -- loss functions + tiny runnable toy demo.
 
 Pipeline:  (1) SFT on noisy demonstrations  ->  (2) reward model (here: a fixed scoring
-function standing in for a trained RM; see reward_modeling.py for training one)
+function standing in for a trained RM; see reward-modeling.py for training one)
 ->  (3) PPO with a per-token KL penalty to the frozen reference (SFT) model.
 
 Four "models" exactly as in RLHF: actor (policy), critic (value net), reward model, reference.
@@ -10,7 +10,7 @@ Four "models" exactly as in RLHF: actor (policy), critic (value net), reward mod
 Toy task: the prompt is one token p in {0..V-1}; the ideal response is the "counting"
 sequence p+1, p+2, ..., p+T (mod V). The reward model scores the fraction of correct tokens.
 
-Run:  python3 code/rlhf_ppo.py      (CPU, ~20-40 s)
+Run:  python3 code/rlhf-ppo.py      (CPU, ~20-40 s)
 """
 import copy
 import torch

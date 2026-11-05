@@ -11,7 +11,7 @@ Part B  SPPO on an INTRANSITIVE preference (rock-paper-scissors + a dominated re
 Part C  SPIN: self-play fine-tuning where 'chosen' = human SFT data, 'rejected' = the model's
         own samples; the fixed point is pi = p_data.
 
-Run: python3 code/online_iterative_self_play_po.py     (CPU, ~1 min)
+Run: python3 code/online-iterative-self-play-po.py     (CPU, ~1 min)
 """
 import copy
 import torch

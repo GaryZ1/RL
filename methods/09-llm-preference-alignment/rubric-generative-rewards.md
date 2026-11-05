@@ -104,7 +104,7 @@ RL loop (GRPO-style)
 
 ## 6. Python implementation
 
-Runnable version: [`code/rubric_generative_rewards.py`](../../code/rubric_generative_rewards.py)
+Runnable version: [`code/rubric-generative-rewards.py`](../../code/rubric-generative-rewards.py)
 
 Each of 4 prompt types has a 5-item rubric: Essential / Important / Important / Optional / Pitfall. Each criterion is checked by a deterministic **verifier** or by a simulated **LLM judge** that answers yes/no and is wrong 10% of the time. The file implements **explicit**, **implicit** (simulated holistic Likert) and **hybrid** rewards, plus a reusable `grpo_loss`. A tiny GRU policy is trained with each reward. Prompt 0 additionally has a verifiable final answer ("last token must be the key fact") that **the rubric does not mention**.
 
@@ -124,7 +124,7 @@ Rubric / generative rewards for non-verifiable tasks + a GRPO-style update.
                 has a checkable answer, rubric-based (generative) reward everywhere.
 * Policy optimization: GRPO-style group-normalized advantages, clipped ratio, k3 KL to ref.
 
-Run: python3 code/rubric_generative_rewards.py    (CPU, ~40 s)
+Run: python3 code/rubric-generative-rewards.py    (CPU, ~40 s)
 """
 import copy
 import torch

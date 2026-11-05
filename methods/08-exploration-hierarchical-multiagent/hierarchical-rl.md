@@ -111,7 +111,7 @@ Option-Critic (one step, actor-critic form)
 
 The classic four-rooms gridworld from Sutton, Precup & Singh (1999): 104 free cells, moves fail with probability 1/3 (going in a random other direction instead), γ = 0.99, and reward +1 only at the goal. We give the agent **8 hallway options** (two per room, "go to hallway A/B", each a shortest-path policy restricted to its room) plus the 4 primitives, and compare against flat Q-learning, averaged over 20 seeds. Pure NumPy.
 
-Runnable version: [`code/hierarchical_rl.py`](../../code/hierarchical_rl.py)
+Runnable version: [`code/hierarchical-rl.py`](../../code/hierarchical-rl.py)
 
 ```python
 """
@@ -123,7 +123,7 @@ Compares
     (each room has two options: "go to hallway A" / "go to hallway B").
 Pure NumPy, runs in seconds.
 
-Run:  python3 code/hierarchical_rl.py
+Run:  python3 code/hierarchical-rl.py
 """
 from collections import deque
 

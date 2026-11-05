@@ -10,7 +10,7 @@ Environment: 6x6 grid, start (0,0), goal (5,5), reward -1 per step, max 20 steps
 (so returns are in [-20, -10]; -10 is optimal). The offline dataset mixes
 behavior policies of very different quality (epsilon-greedy with random epsilon).
 
-Run:  python3 code/decision_transformer.py   (roughly 30-90 s on CPU)
+Run:  python3 code/decision-transformer.py   (roughly 30-90 s on CPU)
 """
 import numpy as np
 import torch

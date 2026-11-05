@@ -15,7 +15,7 @@ The intrinsic reward modules are small PyTorch networks (count-based is a table)
   * ICM         : r_int = 1/2 || f_fwd(phi(s), a) - phi(s') ||^2   (Pathak et al., 2017)
   * RND         : r_int = || f_pred(s') - f_target(s') ||^2        (Burda et al., 2018)
 
-Run:  python3 code/curiosity_icm_rnd.py    (roughly 30-90 s on CPU)
+Run:  python3 code/curiosity-icm-rnd.py    (roughly 30-90 s on CPU)
 """
 import numpy as np
 import torch
@@ -180,6 +180,7 @@ def run(bonus_mod, episodes=250, beta=1.0, eps=0.1, alpha=0.5, gamma=0.98, repla
 if __name__ == "__main__":
     print(f"{LX}x{LY} corridor, reward only at the far corner, horizon {HORIZON}, 250 episodes")
     print(f"{'bonus':<19}{'cells visited':>15}{'first reward (episode)':>24}{'greedy solves':>15}{'steps':>7}")
+    torch.manual_seed(0)                                   # reproducible bonus-network init
     variants = [("none (eps-greedy)", NoBonus(), 0.0),       # beta = 0: Q_int ignored
                 ("optimism only", NoBonus(), 1.0),           # optimistic Q_int, zero bonus
                 ("count", CountBonus(), 1.0),

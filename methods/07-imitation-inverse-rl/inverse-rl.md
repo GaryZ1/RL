@@ -116,7 +116,7 @@ Apprenticeship learning (projection variant)
 
 An 8×8 grid where every cell is *road*, *grass*, *lava* or the *goal*. The hidden true reward is linear in one-hot terrain features, $w_{\text{true}} = [0,-0.3,-2,+1]$. The expert acts soft-optimally on **map A**; we see only 300 of its trajectories. MaxEnt IRL recovers $w$. Then we **plan with the recovered reward on an unseen map B** and measure the *true* return, which is something a cloned state→action table could not do. Pure NumPy.
 
-Runnable version: [`code/inverse_rl.py`](../../code/inverse_rl.py)
+Runnable version: [`code/inverse-rl.py`](../../code/inverse-rl.py)
 
 ```python
 """
@@ -131,7 +131,7 @@ trajectories. MaxEnt IRL recovers w by matching expected feature counts.
 Then we plan with the recovered reward on a NEW map B, which behavior cloning cannot
 transfer to (the states are different), but a reward over features can.
 
-Run:  python3 code/inverse_rl.py     (a few seconds)
+Run:  python3 code/inverse-rl.py     (a few seconds)
 """
 import numpy as np
 

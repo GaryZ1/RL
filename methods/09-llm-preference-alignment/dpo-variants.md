@@ -117,7 +117,7 @@ Input: preference data (pairs; or unpaired labels for KTO), policy pi_theta, opt
 
 ## 6. Python implementation
 
-Runnable version: [`code/dpo_variants.py`](../../code/dpo_variants.py)
+Runnable version: [`code/dpo-variants.py`](../../code/dpo-variants.py)
 
 One function per loss, all with the same tensor conventions as TRL (summed log-probs, response lengths), followed by a head-to-head comparison. A tiny GRU LM generates EOS-terminated sequences. True quality is the fraction of "good" tokens, which is **independent of length**. The simulated annotators are **biased toward longer answers** and **20% of labels are flipped**. Every method trains for the same number of steps from the same SFT model on the same pairs.
 
@@ -135,7 +135,7 @@ Toy task: unconditional generation of variable-length sequences (EOS-terminated,
   Simulated annotators are BIASED toward longer answers and 20% of labels are flipped.
   So a good method should raise quality WITHOUT simply inflating length.
 
-Run: python3 code/dpo_variants.py     (CPU, ~1 min)
+Run: python3 code/dpo-variants.py     (CPU, ~1 min)
 """
 import copy
 import torch

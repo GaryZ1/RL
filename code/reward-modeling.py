@@ -13,7 +13,7 @@ Toy world
 * The reward model (RM) sees token counts + a length one-hot. Lengths 9..16 are never seen
   during training, so the RM must extrapolate there -> classic over-optimization.
 
-Run: python3 code/reward_modeling.py     (CPU, ~15 s)
+Run: python3 code/reward-modeling.py     (CPU, ~15 s)
 """
 import math
 import torch

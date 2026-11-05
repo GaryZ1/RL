@@ -121,7 +121,7 @@ Two parts:
 * **Part A (cooperative CTDE, PyTorch).** The **two-step game** from the QMIX paper. In state 1, agent 1's action chooses which matrix game is played next. Game 2A pays 7 for every joint action; game 2B pays `[[0,1],[1,8]]`. Optimal team return is 8. IQL, VDN and QMIX are trained on the *same* uniformly random joint-action data with shared-parameter agent networks.
 * **Part B (competitive self-play, NumPy).** Rock-paper-scissors: naive "best-respond to my latest self" vs fictitious play.
 
-Runnable version: [`code/multi_agent_rl.py`](../../code/multi_agent_rl.py)
+Runnable version: [`code/multi-agent-rl.py`](../../code/multi-agent-rl.py)
 
 ```python
 """
@@ -143,7 +143,7 @@ Part B (competitive, self-play, NumPy):
   fictitious play (best-respond to the AVERAGE of past selves, the idea behind leagues and
   PSRO-style population training) converges in average strategy to the Nash equilibrium.
 
-Run:  python3 code/multi_agent_rl.py     (about 20-60 s on CPU)
+Run:  python3 code/multi-agent-rl.py     (about 20-60 s on CPU)
 """
 import numpy as np
 import torch

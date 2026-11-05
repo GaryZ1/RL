@@ -11,7 +11,7 @@ Vocabulary (V=10): 0-3 content tokens (the on-topic answer to prompt p is token 
 4-6 filler, 7 = REFUSE (bare, evasive refusal), 8 = EXPLAIN (harmless, engaged explanation),
 9 = HARM (dangerous detail). Prompts 0,1 are benign; prompts 2,3 are harmful requests.
 
-Run: python3 code/rlaif_constitutional_ai.py      (CPU, ~10 s)
+Run: python3 code/rlaif-constitutional-ai.py      (CPU, ~10 s)
 """
 import torch
 import torch.nn as nn
