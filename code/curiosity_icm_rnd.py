@@ -1,15 +1,20 @@
 """
-Exploration bonuses on a sparse-reward gridworld: none vs. count-based vs. ICM vs. RND.
+Exploration bonuses on a sparse-reward corridor: none vs. count-based vs. ICM vs. RND.
 
-Environment: open N x N room, start bottom-left, single reward +1 at the far corner, a time
-limit that makes a random walk almost never reach it.  Agent: a small PPO (shared code for
-all variants).  Intrinsic reward is added to the extrinsic one:  r = r_ext + c * r_int.
+Environment: a 30 x 4 corridor. Start at the left end, a single reward +1 at the far right
+corner, 80-step time limit.  A random walk essentially never reaches the reward.
+
+Agent: Q-learning with a replay buffer and TWO value tables, as in RND's two value heads:
+    Q_ext  learns the extrinsic (task) return,
+    Q_int  learns the intrinsic (novelty) return,
+    behaviour = epsilon-greedy on  Q_ext + BETA * Q_int ;  evaluation = greedy on Q_ext.
+The intrinsic reward modules are small PyTorch networks (count-based is a table):
 
   * count-based : r_int = 1 / sqrt(N(s'))                          (MBIE-EB style)
-  * ICM         : r_int = || f_fwd(phi(s), a) - phi(s') ||^2       (Pathak et al., 2017)
+  * ICM         : r_int = 1/2 || f_fwd(phi(s), a) - phi(s') ||^2   (Pathak et al., 2017)
   * RND         : r_int = || f_pred(s') - f_target(s') ||^2        (Burda et al., 2018)
 
-Run:  python3 code/curiosity_icm_rnd.py    (roughly 1-2 min on CPU)
+Run:  python3 code/curiosity_icm_rnd.py    (roughly 30-90 s on CPU)
 """
 import numpy as np
 import torch
@@ -18,181 +23,163 @@ import torch.nn.functional as F
 
 torch.set_num_threads(1)
 
-N, HORIZON, N_ENVS = 12, 50, 32
+LX, LY, HORIZON = 30, 4, 80
 MOVES = np.array([[1, 0], [0, 1], [-1, 0], [0, -1]])
+N_STATES, N_ACT = LX * LY, 4
+OBS_DIM = LX + LY                     # observation = one-hot(x) ++ one-hot(y)
+GOAL = (LX - 1, LY - 1)
 
 
-class Room:
-    """Vectorised gridworld. Episode ends at the goal or after HORIZON steps."""
-
-    def __init__(self, n):
-        self.n = n
-
+class Corridor:
     def reset(self):
-        self.pos = np.zeros((self.n, 2), int)
-        self.t = np.zeros(self.n, int)
-        return self.obs()
-
-    def obs(self):
-        return (self.pos / (N - 1) * 2 - 1).astype(np.float32)  # coords in [-1, 1]
+        self.pos, self.t = np.array([0, 0]), 0
+        return tuple(self.pos)
 
     def step(self, a):
-        self.pos = np.clip(self.pos + MOVES[a], 0, N - 1)
+        self.pos = np.clip(self.pos + MOVES[a], 0, [LX - 1, LY - 1])
         self.t += 1
-        at_goal = (self.pos == N - 1).all(1)
-        r = at_goal.astype(np.float32)
-        done = at_goal | (self.t >= HORIZON)
-        next_obs = self.obs()                # observation BEFORE auto-reset (used for bonuses)
-        cells = self.pos.copy()
-        self.pos[done] = 0
-        self.t[done] = 0
-        return self.obs(), next_obs, cells, r, done
+        s = tuple(self.pos)
+        r = 1.0 if s == GOAL else 0.0
+        return s, r, (r > 0) or self.t >= HORIZON, r > 0
+
+
+def obs(cells):
+    """Batch of cells -> float tensor of one-hot features [B, LX+LY]."""
+    cells = np.asarray(cells).reshape(-1, 2)
+    return torch.tensor(np.concatenate([np.eye(LX)[cells[:, 0]], np.eye(LY)[cells[:, 1]]], 1),
+                        dtype=torch.float32)
 
 
 def mlp(i, o, h=64):
-    return nn.Sequential(nn.Linear(i, h), nn.ReLU(), nn.Linear(h, h), nn.ReLU(), nn.Linear(h, o))
+    return nn.Sequential(nn.Linear(i, h), nn.ReLU(), nn.Linear(h, o))
 
 
 # ----------------------------------------------------------------------------
-# Intrinsic-reward modules (each exposes .bonus(...) and .update(...))
+# Intrinsic-reward modules.  bonus(S, A, S2) -> array of CURRENT novelty for a batch;
+# update(S, A, S2) trains the module; observe(s2) lets the count table count.
 # ----------------------------------------------------------------------------
-class CountBonus:
-    def __init__(self):
-        self.counts = np.zeros((N, N))
+class NoBonus:
+    def observe(self, s2):
+        pass
 
-    def bonus(self, obs, act, next_obs, cells):
-        np.add.at(self.counts, (cells[:, 0], cells[:, 1]), 1)
-        return torch.tensor(1.0 / np.sqrt(self.counts[cells[:, 0], cells[:, 1]]), dtype=torch.float32)
+    def bonus(self, S, A, S2):
+        return np.zeros(len(S2))
 
-    def update(self, *args):
+    def update(self, S, A, S2):
         pass
 
 
-class RND:
-    """Random Network Distillation: predict a fixed random network's output."""
+class CountBonus(NoBonus):
+    def __init__(self):
+        self.n = np.zeros((LX, LY))
+
+    def observe(self, s2):
+        self.n[s2] += 1
+
+    def bonus(self, S, A, S2):
+        S2 = np.asarray(S2)
+        return 1.0 / np.sqrt(np.maximum(self.n[S2[:, 0], S2[:, 1]], 1))
+
+
+class RND(NoBonus):
+    """A fixed, randomly initialised target network f and a trained predictor f_hat.
+    Prediction error is high on rarely-seen inputs and decays as they become familiar."""
 
     def __init__(self, k=16, lr=1e-3):
-        self.target, self.pred = mlp(2, k), mlp(2, k)
+        self.target, self.pred = mlp(OBS_DIM, k), mlp(OBS_DIM, k)
         for p in self.target.parameters():
             p.requires_grad_(False)
         self.opt = torch.optim.Adam(self.pred.parameters(), lr=lr)
 
-    def _feat_in(self, x):
-        return 3.0 * x  # sharper random features -> finer-grained novelty
+    def error(self, S2):
+        x = obs(S2)
+        return ((self.pred(x) - self.target(x)) ** 2).sum(-1)
 
-    def bonus(self, obs, act, next_obs, cells):
+    def bonus(self, S, A, S2):
         with torch.no_grad():
-            x = self._feat_in(next_obs)
-            return ((self.pred(x) - self.target(x)) ** 2).sum(-1)
+            return self.error(S2).numpy()
 
-    def update(self, obs, act, next_obs):
-        x = self._feat_in(next_obs)
-        loss = ((self.pred(x) - self.target(x)) ** 2).sum(-1).mean()
+    def update(self, S, A, S2):
+        loss = self.error(S2).mean()
         self.opt.zero_grad(); loss.backward(); self.opt.step()
 
 
-class ICM:
-    """Intrinsic Curiosity Module: forward-model error in a feature space trained by an
-    inverse model (so the features only encode what the agent can influence)."""
+class ICM(NoBonus):
+    """Features phi trained by an inverse model (predict a from s, s'); the curiosity
+    reward is the error of a forward model that predicts phi(s') from phi(s) and a."""
 
     def __init__(self, k=16, lr=1e-3, beta=0.2):
-        self.phi = mlp(2, k)
-        self.inv = mlp(2 * k, 4)
-        self.fwd = mlp(k + 4, k)
+        self.phi, self.inv, self.fwd = mlp(OBS_DIM, k), mlp(2 * k, N_ACT), mlp(k + N_ACT, k)
         self.beta = beta
-        params = list(self.phi.parameters()) + list(self.inv.parameters()) + list(self.fwd.parameters())
+        params = [*self.phi.parameters(), *self.inv.parameters(), *self.fwd.parameters()]
         self.opt = torch.optim.Adam(params, lr=lr)
 
-    def _losses(self, obs, act, next_obs):
-        f, f2 = self.phi(obs), self.phi(next_obs)
-        a1h = F.one_hot(act, 4).float()
+    def losses(self, S, A, S2):
+        f, f2 = self.phi(obs(S)), self.phi(obs(S2))
+        a1h = F.one_hot(torch.as_tensor(A), N_ACT).float()
         fwd_err = 0.5 * ((self.fwd(torch.cat([f, a1h], -1)) - f2.detach()) ** 2).sum(-1)
-        inv_loss = F.cross_entropy(self.inv(torch.cat([f, f2], -1)), act)
+        inv_loss = F.cross_entropy(self.inv(torch.cat([f, f2], -1)), torch.as_tensor(A))
         return fwd_err, inv_loss
 
-    def bonus(self, obs, act, next_obs, cells):
+    def bonus(self, S, A, S2):
         with torch.no_grad():
-            return self._losses(obs, act, next_obs)[0]
+            return self.losses(S, A, S2)[0].numpy()
 
-    def update(self, obs, act, next_obs):
-        fwd_err, inv_loss = self._losses(obs, act, next_obs)
+    def update(self, S, A, S2):
+        fwd_err, inv_loss = self.losses(S, A, S2)
         loss = (1 - self.beta) * inv_loss + self.beta * fwd_err.mean()
         self.opt.zero_grad(); loss.backward(); self.opt.step()
 
 
 # ----------------------------------------------------------------------------
-# PPO agent (minimal) + training loop
+# Agent: two-headed Q-learning with replay
 # ----------------------------------------------------------------------------
-class Agent(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.pi, self.v = mlp(2, 4), mlp(2, 1)
-
-
-def run(variant, iters=80, coef=0.5, seed=0):
-    torch.manual_seed(seed); np.random.seed(seed)
-    agent = Agent()
-    opt = torch.optim.Adam(agent.parameters(), lr=1e-3)
-    bonus_mod = {"none": None, "count": CountBonus(), "icm": ICM(), "rnd": RND()}[variant]
-    env, visited, first_goal, int_std = Room(N_ENVS), np.zeros((N, N), bool), None, 1.0
-    o = env.reset()
-    for it in range(iters):
-        O, A, LP, V, R, D, O2 = [], [], [], [], [], [], []
-        for t in range(HORIZON):
-            ot = torch.tensor(o)
-            with torch.no_grad():
-                dist = torch.distributions.Categorical(logits=agent.pi(ot))
-                a = dist.sample()
-            o, o2, cells, r, done = env.step(a.numpy())
-            visited[cells[:, 0], cells[:, 1]] = True
-            if r.any() and first_goal is None:
-                first_goal = it
-            r_int = torch.zeros(N_ENVS) if bonus_mod is None else bonus_mod.bonus(ot, a, torch.tensor(o2), cells)
-            O.append(ot); A.append(a); LP.append(dist.log_prob(a)); V.append(agent.v(ot).squeeze(-1).detach())
-            R.append((torch.tensor(r), r_int)); D.append(torch.tensor(done, dtype=torch.float32)); O2.append(torch.tensor(o2))
-        r_ext = torch.stack([x[0] for x in R]); r_int = torch.stack([x[1] for x in R])
-        if bonus_mod is not None:
-            int_std = 0.9 * int_std + 0.1 * float(r_int.std() + 1e-8)  # running scale normaliser
-            bonus_mod.update(torch.cat(O), torch.cat(A), torch.cat(O2))
-        rew = r_ext + coef * r_int / int_std
-        V_, D_ = torch.stack(V), torch.stack(D)
-        with torch.no_grad():
-            last_v = agent.v(torch.tensor(o)).squeeze(-1)
-        adv, gae = torch.zeros_like(rew), torch.zeros(N_ENVS)
-        for t in reversed(range(HORIZON)):  # GAE(0.95), gamma 0.99
-            nv = last_v if t == HORIZON - 1 else V_[t + 1]
-            delta = rew[t] + 0.99 * nv * (1 - D_[t]) - V_[t]
-            gae = delta + 0.99 * 0.95 * (1 - D_[t]) * gae
-            adv[t] = gae
-        ret = adv + V_
-        Ob, Ab, LPb = torch.cat(O), torch.cat(A), torch.cat(LP)
-        advb, retb = adv.reshape(-1), ret.reshape(-1)
-        advb = (advb - advb.mean()) / (advb.std() + 1e-8)
-        for _ in range(4):
-            for idx in torch.randperm(Ob.shape[0]).split(400):
-                dist = torch.distributions.Categorical(logits=agent.pi(Ob[idx]))
-                ratio = (dist.log_prob(Ab[idx]) - LPb[idx]).exp()
-                pg = -torch.min(ratio * advb[idx], ratio.clamp(0.8, 1.2) * advb[idx]).mean()
-                loss = pg + 0.5 * F.mse_loss(agent.v(Ob[idx]).squeeze(-1), retb[idx]) - 0.01 * dist.entropy().mean()
-                opt.zero_grad(); loss.backward(); opt.step()
-    # greedy evaluation of the final policy
-    env_e = Room(1)
-    oe, succ = env_e.reset(), 0
-    for t in range(HORIZON):
-        with torch.no_grad():
-            a = agent.pi(torch.tensor(oe)).argmax(-1).numpy()
-        oe, _, _, r, done = env_e.step(a)
-        if r.any():
-            succ = 1
-            break
-    return visited.mean(), first_goal, succ
+def run(bonus_mod, episodes=250, beta=1.0, eps=0.1, alpha=0.5, gamma=0.98, replay_k=8, seed=0, q_int_init=0.0):
+    rng = np.random.default_rng(seed)
+    torch.manual_seed(seed)
+    Qe, Qi = np.zeros((LX, LY, N_ACT)), np.full((LX, LY, N_ACT), q_int_init)
+    buf, visited, first_goal, int_scale = [], np.zeros((LX, LY), bool), None, None
+    env = Corridor()
+    for ep in range(episodes):
+        s, done = env.reset(), False
+        while not done:
+            q = Qe[s] + beta * Qi[s]
+            a = int(rng.integers(N_ACT)) if rng.random() < eps else int(rng.choice(np.flatnonzero(q == q.max())))
+            s2, r, done, term = env.step(a)
+            bonus_mod.observe(s2)
+            buf.append((s, a, r, s2, term))
+            visited[s2] = True
+            if r > 0 and first_goal is None:
+                first_goal = ep
+            # replay: online transition + a few random old ones (fast reward propagation).
+            # Intrinsic rewards are recomputed NOW, so familiar states stop paying a bonus.
+            batch = [buf[-1]] + [buf[i] for i in rng.integers(len(buf), size=replay_k)]
+            S, A, R, S2, Tm = zip(*batch)
+            r_int = bonus_mod.bonus(list(S), list(A), list(S2))
+            if int_scale is None and r_int.max() > 0:
+                int_scale = float(r_int.max())     # fixed normaliser: first bonus seen ~ 1
+            r_int = r_int / int_scale if int_scale else r_int
+            for (bs, ba, br, bs2, bt), bri in zip(batch, r_int):
+                Qe[bs][ba] += alpha * (br + gamma * (1 - bt) * Qe[bs2].max() - Qe[bs][ba])
+                Qi[bs][ba] += alpha * (bri + gamma * Qi[bs2].max() - Qi[bs][ba])  # non-episodic intrinsic
+            if len(buf) % 16 == 0:  # train the bonus network on recent transitions
+                S, A, _, S2, _ = zip(*buf[-64:])
+                bonus_mod.update(list(S), list(A), list(S2))
+            s = s2
+    # greedy evaluation on the EXTRINSIC value only
+    s, done, solved, steps = env.reset(), False, False, 0
+    while not done:
+        s, r, done, term = env.step(int(Qe[s].argmax()))
+        solved, steps = solved or term, steps + 1
+    return visited.mean(), first_goal, solved, steps
 
 
 if __name__ == "__main__":
-    print(f"{N}x{N} room, goal at the far corner, horizon {HORIZON}, {N_ENVS} parallel envs, PPO")
-    print(f"{'bonus':<8}{'cells visited':>15}{'first goal at iter':>20}{'greedy policy solves':>22}")
-    for variant in ["none", "count", "icm", "rnd"]:
-        cov, fg, succ = run(variant)
-        print(f"{variant:<8}{100*cov:>14.0f}%{str(fg):>20}{('yes' if succ else 'no'):>22}")
-    print("\nWithout a bonus the agent rarely stumbles onto the reward; novelty bonuses push it\n"
-          "toward unvisited cells until the extrinsic reward is found and can be exploited.")
+    print(f"{LX}x{LY} corridor, reward only at the far corner, horizon {HORIZON}, 250 episodes")
+    print(f"{'bonus':<8}{'cells visited':>15}{'first reward (episode)':>24}{'greedy solves':>15}{'steps':>7}")
+    for name, mod in [("none", NoBonus()), ("count", CountBonus()), ("ICM", ICM()), ("RND", RND())]:
+        cov, fg, solved, steps = run(mod)
+        print(f"{name:<8}{100*cov:>14.0f}%{str(fg):>24}{('yes' if solved else 'no'):>15}{steps:>7}")
+    print("\nWithout a bonus, epsilon-greedy dithering almost never finds the reward. Novelty bonuses\n"
+          "drive the agent systematically into unvisited cells; once the reward is found, the separate\n"
+          f"extrinsic Q-table lets the greedy policy exploit it (optimal path = {LX - 1 + LY - 1} steps).")

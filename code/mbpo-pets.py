@@ -75,7 +75,7 @@ class EnsembleLinear(nn.Module):
 class ProbabilisticEnsemble(nn.Module):
     """Each member outputs mean and log-variance of the state CHANGE  delta = s' - s."""
 
-    def __init__(self, obs_dim, act_dim, E=5, hidden=128):
+    def __init__(self, obs_dim, act_dim, E=5, hidden=96):
         super().__init__()
         self.E, self.obs_dim = E, obs_dim
         self.layers = nn.ModuleList([EnsembleLinear(E, obs_dim + act_dim, hidden), EnsembleLinear(E, hidden, hidden),
@@ -138,7 +138,7 @@ def train_ensemble(model, opt, X_obs, X_act, Y, epochs=40, batch=256):
 # 3. CEM planner with trajectory sampling (TS-infinity: each particle sticks to one ensemble member)
 # ----------------------------------------------------------------------------------------------
 class CEMPlanner:
-    def __init__(self, model, horizon=20, pop=400, elites=40, iters=5, alpha=0.1, max_a=2.0):
+    def __init__(self, model, horizon=15, pop=200, elites=20, iters=4, alpha=0.1, max_a=2.0):
         self.m, self.H, self.pop, self.n_elite, self.iters, self.alpha, self.max_a = \
             model, horizon, pop, elites, iters, alpha, max_a
         self.mean = torch.zeros(horizon, 1)

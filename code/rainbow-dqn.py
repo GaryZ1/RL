@@ -8,10 +8,12 @@ Combines the DQN extensions from Hessel et al. (2018), "Rainbow":
   * Prioritized replay (Schaul et al. 2016)       -> sum-tree, proportional variant, IS weights
   * Noisy Nets         (Fortunato et al. 2018)    -> optional (USE_NOISY), replaces epsilon-greedy
 The distributional (C51) head is shown separately in code/distributional-rl.py.
-Run:  python3 code/rainbow-dqn.py      (about 1 minute on CPU)
+Run:  python3 code/rainbow-dqn.py                  (about 1-1.5 minutes on CPU)
+      python3 code/rainbow-dqn.py --noisy --seed 1  (Noisy Nets instead of epsilon-greedy)
 """
 import math
 import random
+import sys
 from collections import deque
 
 import numpy as np
@@ -279,6 +281,8 @@ def _sanity_checks():
 if __name__ == "__main__":
     torch.set_num_threads(1)
     _sanity_checks()
-    before, final, best = train()
-    print(f"\nDouble+Dueling+3-step+PER greedy return: before {before:.1f} -> after {final:.1f} (max 200)")
+    noisy = "--noisy" in sys.argv
+    seed = int(sys.argv[sys.argv.index("--seed") + 1]) if "--seed" in sys.argv else 0
+    before, final, best = train(use_noisy=noisy, seed=seed)
+    print(f"\nDouble+Dueling+3-step+PER{'+Noisy' if noisy else ''} greedy return: before {before:.1f} -> after {final:.1f} (max 200)")
     print(f"Best snapshot, re-tested on new episodes: {best:.1f}")
