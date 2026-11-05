@@ -249,15 +249,15 @@ def tabular_distributional_demo():
     """Distributional Bellman operator on a 2-state chain, tabular C51-style.
     A --(r=0)--> B --(r=10 w.p. 0.3, else 0)--> end.  gamma = 0.9.
     Expected value of A is 0.9 * 3 = 2.7, but the *distribution* is bimodal: {0: 0.7, 9: 0.3}."""
-    rng = np.random.default_rng(0)
     support = torch.linspace(0, 10, 11)
     Z = {s: torch.full((11,), 1 / 11) for s in "AB"}           # start from uniform distributions
-    for _ in range(3000):
-        r = 10.0 if rng.random() < 0.3 else 0.0                  # sample a transition from B
-        m = categorical_projection(Z["B"][None], torch.tensor([r]), torch.tensor([0.0]), support)[0]
-        Z["B"] = 0.98 * Z["B"] + 0.02 * m
-        m = categorical_projection(Z["B"][None], torch.tensor([0.0]), torch.tensor([0.9]), support)[0]
-        Z["A"] = 0.98 * Z["A"] + 0.02 * m                       # transition from A (deterministic)
+    proj = lambda z, r, g: categorical_projection(z[None], torch.tensor([r]), torch.tensor([g]),
+                                                  support)[0]
+    for _ in range(3):   # apply the (projected) distributional Bellman operator  Z <- Pi T Z
+        # B: mixture over the two possible rewards, episode ends (discount 0)
+        Z["B"] = 0.3 * proj(Z["B"], 10.0, 0.0) + 0.7 * proj(Z["B"], 0.0, 0.0)
+        # A: deterministic reward 0, then shrink Z(B) by gamma = 0.9 and re-project
+        Z["A"] = proj(Z["B"], 0.0, 0.9)
     pa = Z["A"]
     print("tabular demo: Z(A) mass on atoms 0..10 =", [round(x, 2) for x in pa.tolist()])
     print(f"              E[Z(A)] = {(pa * support).sum():.2f} (true 2.7); "

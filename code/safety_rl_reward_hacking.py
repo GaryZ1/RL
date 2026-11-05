@@ -107,10 +107,10 @@ def run_safe_rlhf(mode, steps=400, limit=0.1, K=4):
 
 def part_a():
     print("Part A: Safe RLHF (constraint: E[cost | harmful prompt] <= 0.1)")
-    print(f"{'mode':<15}{'E[reward]':>10}{'E[cost]':>9}{'safe-help rate':>16}{'final lam':>10}{'max lam':>9}")
+    print(f"{'mode':<15}{'E[reward]':>10}{'E[cost]':>9}{'safe-help rate':>16}{'final lam':>11}{'max lam':>9}")
     for mode in ["reward-only", "fixed-penalty", "lagrangian"]:
         r, c, s, lam, lam_max = run_safe_rlhf(mode)
-        print(f"{mode:<15}{r:>10.3f}{c:>9.3f}{s:>16.3f}{lam:>10.2f}{lam_max:>9.2f}")
+        print(f"{mode:<15}{r:>10.3f}{c:>9.3f}{s:>16.3f}{lam:>11.2f}{lam_max:>9.2f}")
 
 # ----------------------------------------------------------------------------------
 # Part B
