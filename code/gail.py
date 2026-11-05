@@ -108,7 +108,7 @@ def ppo_update(pi, opt, obs, act, logp_old, adv, ret, epochs=4, mb=512, clip=0.2
             ratio = (logp - logp_old[idx]).exp()
             pg = -torch.min(ratio * adv[idx], ratio.clamp(1 - clip, 1 + clip) * adv[idx]).mean()
             v_loss = F.mse_loss(pi.v(obs[idx]).squeeze(-1), ret[idx])
-            loss = pg + 0.5 * v_loss - 0.0 * d.entropy().sum(-1).mean()
+            loss = pg + 0.5 * v_loss          # (an entropy bonus is optional here)
             opt.zero_grad(); loss.backward(); opt.step()
 
 
@@ -139,8 +139,8 @@ def train_gail(s_exp, a_exp, iters=300):
             o, _, done = env.step(a.numpy())
         O, A, LP, V = map(torch.stack, (O, A, LP, V))       # [T, N, ...]
         flatO, flatA = O.reshape(-1, 4), A.reshape(-1, 2)
-        # (1) discriminator step(s)
-        for _ in range(2):
+        # (1) a few discriminator steps (a weak D gives an uninformative reward)
+        for _ in range(5):
             idx = torch.randint(0, s_exp.shape[0], (flatO.shape[0],))
             ld = discriminator_loss(D, s_exp[idx], a_exp[idx], flatO, flatA.clamp(-1, 1))
             opt_d.zero_grad(); ld.backward(); opt_d.step()

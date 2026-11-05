@@ -356,7 +356,7 @@ Output:
    TD(lambda) replacing    lam=0.0  best alpha=0.60  RMS=0.370
    TD(lambda) replacing    lam=0.4  best alpha=0.60  RMS=0.291
    TD(lambda) replacing    lam=0.8  best alpha=0.40  RMS=0.267
-   TD(lambda) replacing    lam=0.9  best alpha=0.20  RMS=0.268
+   TD(lambda) replacing    lam=0.9  best alpha=0.40  RMS=0.268
    TD(lambda) replacing    lam=1.0  best alpha=0.20  RMS=0.384
 
 Offline lambda-return vs offline TD(lambda): max |difference| = 3.11e-15
