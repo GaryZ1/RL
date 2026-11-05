@@ -115,7 +115,8 @@ import re
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 
-dataset = load_dataset("trl-lib/DeepMath-103K", split="train")   # any dataset with a "prompt" column
+# placeholder name: any dataset with a "prompt" column and a "solution" (final answer) column
+dataset = load_dataset("your-org/math-prompts-with-answers", split="train")
 
 def format_reward(completions, **kwargs):
     pattern = r"^<think>.*?</think>\s*<answer>.*?</answer>$"
