@@ -390,7 +390,7 @@ Modern Atari implementations (e.g. Dopamine, CleanRL) often use Adam and a final
 
 ## 12. For kids (ages ~8–12)
 
-**Story.** Robo the robot is learning to balance a broom on its hand. Every time it tries, it writes a sticky note: "Broom leaning left, I moved right → it stayed up! 👍" or "...it fell 👎". Robo keeps thousands of sticky notes in a big jar. At night, Robo pulls out random notes and practices guessing: "If the broom leans left, how many seconds will it stay up if I move right?" Robo keeps one "official guess book" that it only updates once in a while, so it doesn't get confused by changing its mind every second. After lots of nights, Robo's guesses are great — and it just picks the move with the best guess!
+**Story.** Robo the robot is learning to balance a broom on its hand. Every time it tries, it writes a sticky note: "Broom leaning left, I moved right → it stayed up! (thumbs up)" or "...it fell (thumbs down)". Robo keeps thousands of sticky notes in a big jar. At night, Robo pulls out random notes and practices guessing: "If the broom leans left, how many seconds will it stay up if I move right?" Robo keeps one "official guess book" that it only updates once in a while, so it doesn't get confused by changing its mind every second. After lots of nights, Robo's guesses are great — and it just picks the move with the best guess!
 
 **Try it yourself.** Balance a pencil (eraser up) on your palm. Each try, note what you did when it started to fall (moved toward the lean, or away?). Write 10 notes, then shuffle them and read them back. Which move kept it up longer?
 
