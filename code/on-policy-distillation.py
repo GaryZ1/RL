@@ -60,7 +60,7 @@ def generalized_jsd_loss(student_logits, teacher_logits, mask, beta=0.5):
 # ----------------------------------------------------------------------------------------
 # (b) Teacher, student, task
 # ----------------------------------------------------------------------------------------
-def teacher_logits(prompts, tokens):
+def teacher_logits(prompts, tokens, total_len=LENGTH):
     """Near-oracle teacher: at each step, digits that keep the target reachable get logit 0, the
     rest -8. Prefers smaller digits slightly (a 'style' the student should also pick up)."""
     B, T = tokens.shape
@@ -69,7 +69,7 @@ def teacher_logits(prompts, tokens):
     digits = torch.arange(VOCAB)
     for t in range(T):
         remaining = prompts[:, None] - partial[:, None] - digits[None]      # after choosing digit
-        slots = T - t - 1
+        slots = total_len - t - 1
         ok = (remaining >= 0) & (remaining <= (VOCAB - 1) * slots)
         out.append(torch.where(ok, -0.2 * digits.float()[None], torch.full((B, VOCAB), -8.0)))
         partial = partial + tokens[:, t]
