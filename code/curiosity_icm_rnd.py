@@ -5,8 +5,9 @@ Environment: a 30 x 4 corridor. Start at the left end, a single reward +1 at the
 corner, 80-step time limit.  A random walk essentially never reaches the reward.
 
 Agent: Q-learning with a replay buffer and TWO value tables, as in RND's two value heads:
-    Q_ext  learns the extrinsic (task) return,
-    Q_int  learns the intrinsic (novelty) return,
+    Q_ext  learns the extrinsic (task) return (episodic),
+    Q_int  learns the intrinsic (novelty) return (non-episodic), initialised optimistically,
+           which is the tabular stand-in for a neural Q_int generalising to unseen actions,
     behaviour = epsilon-greedy on  Q_ext + BETA * Q_int ;  evaluation = greedy on Q_ext.
 The intrinsic reward modules are small PyTorch networks (count-based is a table):
 
@@ -134,9 +135,11 @@ class ICM(NoBonus):
 # ----------------------------------------------------------------------------
 # Agent: two-headed Q-learning with replay
 # ----------------------------------------------------------------------------
-def run(bonus_mod, episodes=250, beta=1.0, eps=0.1, alpha=0.5, gamma=0.98, replay_k=8, seed=0, q_int_init=0.0):
+def run(bonus_mod, episodes=250, beta=1.0, eps=0.1, alpha=0.5, gamma=0.98, replay_k=8, seed=0, q_int_init=None):
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
+    if q_int_init is None:
+        q_int_init = 1.0 / (1 - gamma)  # optimistic: 'every untried action is maximally novel forever'
     Qe, Qi = np.zeros((LX, LY, N_ACT)), np.full((LX, LY, N_ACT), q_int_init)
     buf, visited, first_goal, int_scale = [], np.zeros((LX, LY), bool), None, None
     env = Corridor()
@@ -176,10 +179,17 @@ def run(bonus_mod, episodes=250, beta=1.0, eps=0.1, alpha=0.5, gamma=0.98, repla
 
 if __name__ == "__main__":
     print(f"{LX}x{LY} corridor, reward only at the far corner, horizon {HORIZON}, 250 episodes")
-    print(f"{'bonus':<8}{'cells visited':>15}{'first reward (episode)':>24}{'greedy solves':>15}{'steps':>7}")
-    for name, mod in [("none", NoBonus()), ("count", CountBonus()), ("ICM", ICM()), ("RND", RND())]:
-        cov, fg, solved, steps = run(mod)
-        print(f"{name:<8}{100*cov:>14.0f}%{str(fg):>24}{('yes' if solved else 'no'):>15}{steps:>7}")
-    print("\nWithout a bonus, epsilon-greedy dithering almost never finds the reward. Novelty bonuses\n"
-          "drive the agent systematically into unvisited cells; once the reward is found, the separate\n"
-          f"extrinsic Q-table lets the greedy policy exploit it (optimal path = {LX - 1 + LY - 1} steps).")
+    print(f"{'bonus':<19}{'cells visited':>15}{'first reward (episode)':>24}{'greedy solves':>15}{'steps':>7}")
+    variants = [("none (eps-greedy)", NoBonus(), 0.0),       # beta = 0: Q_int ignored
+                ("optimism only", NoBonus(), 1.0),           # optimistic Q_int, zero bonus
+                ("count", CountBonus(), 1.0),
+                ("ICM", ICM(), 1.0),
+                ("RND", RND(), 1.0)]
+    for name, mod, beta in variants:
+        cov, fg, solved, steps = run(mod, beta=beta)
+        print(f"{name:<19}{100*cov:>14.0f}%{str(fg):>24}{('yes' if solved else 'no'):>15}{steps:>7}")
+    print("\nEpsilon-greedy dithering almost never finds the reward. Directed exploration (optimism,\n"
+          "counts, RND) sweeps the corridor; once the reward is found, the separate extrinsic Q-table\n"
+          f"lets the greedy policy exploit it (optimal path = {LX - 1 + LY - 1} steps). In a small table,\n"
+          "optimism ~ counts is enough; learned bonuses (RND/ICM) exist for spaces too big to count.\n"
+          "ICM's forward model generalises across this simple deterministic grid, so its bonus fades fast.")

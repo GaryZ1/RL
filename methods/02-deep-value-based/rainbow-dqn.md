@@ -111,7 +111,7 @@ Input: n-step n, PER exponents alpha, beta0, target period C, discount gamma, to
 
 ## 6. Python implementation
 
-The script below implements **Double DQN + Dueling + 3-step returns + Prioritized Replay (sum tree)** with optional **Noisy Nets** (`use_noisy=True`). The distributional C51 head lives in [`code/distributional-rl.py`](../../code/distributional-rl.py) so that each file stays readable; plugging it in means replacing the dueling scalar output by per-atom logits and the Huber loss by the projected cross-entropy. The environment is a NumPy cart-pole (200-step cap). The script also runs two unit checks (n-step returns, sum-tree sampling frequencies).
+The script below implements **Double DQN + Dueling + 3-step returns + Prioritized Replay (sum tree)** with optional **Noisy Nets** (`--noisy` flag / `use_noisy=True`). The distributional C51 head lives in [`code/distributional-rl.py`](../../code/distributional-rl.py) so that each file stays readable; plugging it in means replacing the dueling scalar output by per-atom logits and the Huber loss by the projected cross-entropy. The environment is a NumPy cart-pole (200-step cap). The script also runs two unit checks (n-step returns, sum-tree sampling frequencies).
 
 Runnable version: [`code/rainbow-dqn.py`](../../code/rainbow-dqn.py)
 
@@ -126,10 +126,12 @@ Combines the DQN extensions from Hessel et al. (2018), "Rainbow":
   * Prioritized replay (Schaul et al. 2016)       -> sum-tree, proportional variant, IS weights
   * Noisy Nets         (Fortunato et al. 2018)    -> optional (USE_NOISY), replaces epsilon-greedy
 The distributional (C51) head is shown separately in code/distributional-rl.py.
-Run:  python3 code/rainbow-dqn.py      (about 1 minute on CPU)
+Run:  python3 code/rainbow-dqn.py                  (about 1-1.5 minutes on CPU)
+      python3 code/rainbow-dqn.py --noisy --seed 1  (Noisy Nets instead of epsilon-greedy)
 """
 import math
 import random
+import sys
 from collections import deque
 
 import numpy as np
@@ -397,8 +399,10 @@ def _sanity_checks():
 if __name__ == "__main__":
     torch.set_num_threads(1)
     _sanity_checks()
-    before, final, best = train()
-    print(f"\nDouble+Dueling+3-step+PER greedy return: before {before:.1f} -> after {final:.1f} (max 200)")
+    noisy = "--noisy" in sys.argv
+    seed = int(sys.argv[sys.argv.index("--seed") + 1]) if "--seed" in sys.argv else 0
+    before, final, best = train(use_noisy=noisy, seed=seed)
+    print(f"\nDouble+Dueling+3-step+PER{'+Noisy' if noisy else ''} greedy return: before {before:.1f} -> after {final:.1f} (max 200)")
     print(f"Best snapshot, re-tested on new episodes: {best:.1f}")
 ```
 
@@ -415,6 +419,8 @@ step  25000  avg train return (last 20 eps)= 197.2  greedy eval= 159.2
 Double+Dueling+3-step+PER greedy return: before 9.6 -> after 159.2 (max 200)
 Best snapshot, re-tested on new episodes: 200.0
 ```
+
+**Noisy Nets run** (`python3 code/rainbow-dqn.py --noisy --seed 1`): with seed 1 the noisy agent reached a greedy return of 200 within 5k steps and stayed there. With seed 0, however, it got stuck at ~9.5 (the "always push the same way" policy): the initial noise was too small to flip the greedy action often enough, and nothing forces exploration once one action's Q-value pulls ahead. This is a real property of Noisy Nets — exploration depends on the learned noise scale and on initialization — and is why some implementations keep a tiny ε floor as a safety net.
 
 Compared with the plain DQN in [`code/dqn.py`](../../code/dqn.py) on the same environment, the combined agent reaches the 200 cap within about 10–15k steps instead of oscillating around 100–190 — a small-scale echo of the Rainbow result. (Single runs on CartPole are noisy; compare over several seeds before drawing conclusions.)
 
@@ -438,7 +444,7 @@ Compared with the plain DQN in [`code/dqn.py`](../../code/dqn.py) on the same en
 - **PER details matter**: new transitions get *max* priority (so everything is replayed at least once); add a small $\epsilon$ to priorities; anneal $\beta \to 1$; normalize IS weights by their max; use a power-of-two sum tree to avoid indexing bugs.
 - **n-step + replay is slightly off-policy-biased**: the stored rewards came from an older ε-greedy policy. Keep $n$ small (3–5) or use corrections (Retrace, as in Reactor).
 - **Episode ends in n-step**: flush the queue on termination *and* truncation, but only zero the bootstrap on true termination (this is what `NStepAccumulator` does).
-- **Noisy Nets**: resample noise every training step (and per acting step); evaluate either with the noisy net or with noise disabled (mean weights) — be consistent. On very easy tasks Noisy Nets can explore too little or too much; ε-greedy is a fine fallback.
+- **Noisy Nets**: watch the action entropy / fraction of each action early on; if the agent locks onto one action before learning anything, raise $\sigma_0$ or add a small ε floor. Resample noise every training step (and per acting step); evaluate either with the noisy net or with noise disabled (mean weights) — be consistent. On very easy tasks Noisy Nets can explore too little or too much; ε-greedy is a fine fallback.
 - **Lower learning rate than DQN** when combining with PER (larger effective step sizes on high-priority samples).
 - **Debugging**: plot the distribution of priorities (should not collapse onto a handful of transitions), max IS weight, mean Q (Double DQN should be lower than DQN's), and the advantage stream magnitude (dueling).
 

@@ -155,9 +155,10 @@ def masked_pg_loss(logp, adv, mask):
 # ----------------------------------------------------------------------------------------
 # (b) Training
 # ----------------------------------------------------------------------------------------
-def sft_warm_start(policy, steps=40, lr=3e-3):
-    """'Cold-start' SFT on ONE-HOP demonstrations only (search q -> read value -> answer).
-    The agent learns the tool format but has never seen a pointer (KEY) observation."""
+def sft_warm_start(policy, steps=40, lr=3e-3, n_two_hop_demos=0):
+    """'Cold-start' SFT. By default only ONE-HOP demonstrations (search q -> read value -> answer):
+    the agent learns the tool format but has never seen a pointer (KEY) observation.
+    n_two_hop_demos > 0 adds a few full two-hop demonstrations per batch."""
     opt = torch.optim.Adam(policy.parameters(), lr=lr)
     for _ in range(steps):
         feats, acts = [], []
@@ -165,17 +166,22 @@ def sft_warm_start(policy, steps=40, lr=3e-3):
             env = TwoHopLookupEnv(random.randrange(10 ** 9), hops=1)
             feats += [state_features(env.q, OBS_NONE, 0), state_features(env.q, N_KEYS + env.v, 1)]
             acts += [env.q, N_KEYS + env.v]
+        for _ in range(n_two_hop_demos):
+            env = TwoHopLookupEnv(random.randrange(10 ** 9), hops=2)
+            feats += [state_features(env.q, OBS_NONE, 0), state_features(env.q, env.k2, 1),
+                      state_features(env.q, N_KEYS + env.v, 2)]
+            acts += [env.q, env.k2, N_KEYS + env.v]
         loss = nn.functional.cross_entropy(policy(torch.stack(feats)), torch.tensor(acts))
         opt.zero_grad()
         loss.backward()
         opt.step()
 
 
-def train(adv_mode, iters=300, n_tasks=16, G=8, lr=5e-3, seed=0, kl_coef=0.0):
+def train(adv_mode, iters=300, n_tasks=16, G=8, lr=5e-3, seed=0, kl_coef=0.0, n_two_hop_demos=0):
     torch.manual_seed(seed)
     random.seed(seed)
     policy = nn.Sequential(nn.Linear(N_FEAT, 64), nn.Tanh(), nn.Linear(64, N_ACT))
-    sft_warm_start(policy)
+    sft_warm_start(policy, n_two_hop_demos=n_two_hop_demos)
     ref = copy.deepcopy(policy)                         # SFT policy as KL anchor
     opt = torch.optim.Adam(policy.parameters(), lr=lr)
     log = []
@@ -215,26 +221,30 @@ if __name__ == "__main__":
     print("ideal trajectory  :", " ".join(VOCAB_NAMES[t] for t in toks))
     print("loss mask         :", mask, "(tool outputs are masked out)\n")
     print("one-hop SFT warm start, then RL on two-hop tasks (pointer observations never seen in SFT)")
-    print("success rate (mean turns) by training phase, mean of 2 seeds; ideal = 1.0 with 3 turns")
+    print("success rate (mean turns) by training phase; reliable strategy = ~1.0 success with 3 turns")
     trained = None
-    for mode in ["grpo", "gigpo", "gigpo-std"]:
+    runs = [("grpo", "grpo", 2, 0), ("gigpo", "gigpo", 2, 0), ("gigpo-std", "gigpo-std", 1, 0)]
+    for label, mode, n_seeds, demos in runs:
         res = []
-        for s in range(2):
-            pol, lg = train(mode, seed=s)
+        for s in range(n_seeds):
+            pol, lg = train(mode, seed=s, n_two_hop_demos=demos)
             res.append(lg)
-            if mode == "gigpo" and s == 0:
+            if label == "gigpo" and s == 0:
                 trained = pol
         cells = []
         for sl in [slice(0, 20), slice(100, 150), slice(-20, None)]:
-            succ = sum(sum(x[0] for x in r[sl]) / len(r[sl]) for r in res) / 2
-            turns = sum(sum(x[1] for x in r[sl]) / len(r[sl]) for r in res) / 2
+            succ = sum(sum(x[0] for x in r[sl]) / len(r[sl]) for r in res) / n_seeds
+            turns = sum(sum(x[1] for x in r[sl]) / len(r[sl]) for r in res) / n_seeds
             cells.append(f"{succ:.3f} ({turns:.2f})")
-        print(f"  {mode:9s} its 0-20: {cells[0]} | its 100-150: {cells[1]} | last 20: {cells[2]}")
+        print(f"  {label:24s} seeds={n_seeds} its 0-20: {cells[0]} | its 100-150: {cells[1]} | last 20: {cells[2]}")
     policy = trained
+    print("\nInspecting the 'gigpo' agent (seed 0): does it SEARCH the question key first?")
     with torch.no_grad():
         probs = [torch.softmax(policy(state_features(q, OBS_NONE, 0)), -1) for q in range(N_KEYS)]
     print("P(first action = SEARCH(q)) per question key:", [round(p_[q].item(), 2) for q, p_ in enumerate(probs)])
-    for task in [12345, 777, 2026]:
+    print("-> typically NOT: RL found a 'gamble' shortcut (search one fixed key; if it holds a value,\n"
+          "   answer it, otherwise fall back to the chain), a local optimum below the reliable strategy.")
+    for task in range(5):
         env = TwoHopLookupEnv(seed=task)
         ep = rollout(policy, env)
         toks, mask = build_token_sequence_and_mask([], ep)
