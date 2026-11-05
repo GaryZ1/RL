@@ -143,19 +143,19 @@ def prm_step_advantages(step_scores, prev_score):
 # ----------------------------------------------------------------------------------------
 # (a2) PRIME: implicit PRM from outcome labels
 # ----------------------------------------------------------------------------------------
-def implicit_prm_token_rewards(logp_phi, logp_ref, beta=0.05):
+def implicit_prm_token_rewards(logp_phi, logp_ref, beta=0.5):
     """Implicit process reward of token/step t: r_t = beta * log pi_phi(y_t|y_<t) / pi_ref(y_t|y_<t).
     Their sum is the sequence-level implicit reward r_phi(y) = beta * log pi_phi(y)/pi_ref(y)."""
     return beta * (logp_phi - logp_ref)
 
 
-def implicit_prm_ce_loss(logp_phi, logp_ref, outcome, mask, beta=0.05):
+def implicit_prm_ce_loss(logp_phi, logp_ref, outcome, mask, beta=0.5):
     """Train pi_phi with cross-entropy on OUTCOME labels: sigma(r_phi(y)) should predict correctness."""
     r_seq = (implicit_prm_token_rewards(logp_phi, logp_ref, beta) * mask).sum(1)
     return nn.functional.binary_cross_entropy_with_logits(r_seq, outcome)
 
 
-def prime_advantages(outcome, proc_rewards, mask, G):
+def prime_advantages(outcome, proc_rewards, mask, G, proc_coef=1.0):
     """PRIME-style advantages (sketch): leave-one-out (RLOO) baseline for both the outcome reward
     and the implicit process rewards, process part turned into a return-to-go, then summed."""
     r = outcome.view(-1, G)
@@ -165,7 +165,7 @@ def prime_advantages(outcome, proc_rewards, mask, G):
     baseline = ((sm.sum(1, keepdim=True) - sm) / (G - 1)).view(-1, 1)
     proc = (proc_rewards - baseline) * mask
     a_proc = torch.flip(torch.cumsum(torch.flip(proc, [1]), 1), [1])     # return-to-go
-    return a_out + a_proc
+    return a_out + proc_coef * a_proc
 
 
 def logp_of(model, feats, acts):
@@ -184,7 +184,7 @@ def make_base_policy():
         k = torch.randint(0, K, (512,))
         good = torch.stack([torch.tensor([int(dd - s) in REACH[K - kk - 1] for s in STEPS.tolist()])
                             for dd, kk in zip(d.tolist(), k.tolist())]).float()
-        target = (good + 0.6) / (good + 0.6).sum(1, keepdim=True)     # soft, deliberately noisy
+        target = (good + 0.25) / (good + 0.25).sum(1, keepdim=True)   # soft, deliberately noisy
         loss = -(target * torch.log_softmax(pol(feat(d, k)), -1)).sum(1).mean()
         opt.zero_grad()
         loss.backward()
@@ -192,11 +192,12 @@ def make_base_policy():
     return pol
 
 
-def rl(policy0, mode, iters=80, n=64, G=8, lr=2e-3, seed=0):
+def rl(policy0, mode, iters=80, n=64, G=8, lr=2e-3, seed=0, phi_init=None, proc_coef=0.2):
     torch.manual_seed(seed)
     pol = copy.deepcopy(policy0)
     ref = copy.deepcopy(policy0)
-    prm_phi = copy.deepcopy(policy0)            # implicit PRM initialised from the reference
+    # implicit PRM: initialised from the reference (PRIME) or from a warmed-up implicit PRM
+    prm_phi = copy.deepcopy(phi_init if phi_init is not None else policy0)
     opt = torch.optim.Adam(pol.parameters(), lr=lr)
     opt_phi = torch.optim.Adam(prm_phi.parameters(), lr=1e-3)
     accs = []
@@ -218,7 +219,7 @@ def rl(policy0, mode, iters=80, n=64, G=8, lr=2e-3, seed=0):
             opt_phi.step()
             with torch.no_grad():
                 proc = implicit_prm_token_rewards(logp_of(prm_phi, feats, acts), lp_ref)
-            adv = prime_advantages(correct, proc, mask, G)
+            adv = prime_advantages(correct, proc, mask, G, proc_coef)
         loss = -(logp_of(pol, feats, acts) * adv).sum() / mask.sum()
         opt.zero_grad()
         loss.backward()
@@ -238,7 +239,7 @@ if __name__ == "__main__":
     valid = step_valid(dists)
     print(f"MC hard labels agree with ground-truth step validity on {(hard == valid).float().mean():.3f} "
           f"of steps (false 'bad' labels come from unlucky rollouts)")
-    prm = train_prm(dists, soft)
+    prm = train_prm(dists, hard)          # Math-Shepherd "hard estimation" labels
     test_d0 = sample_problems(300)
     _, _, tdists, tcorrect = solve(base, test_d0)
     tscores = prm_step_scores(prm, tdists)
@@ -273,7 +274,7 @@ if __name__ == "__main__":
     ref = copy.deepcopy(base)
     phi = copy.deepcopy(base)
     opt = torch.optim.Adam(phi.parameters(), lr=1e-3)
-    for _ in range(150):
+    for _ in range(300):
         dd = sample_problems(256)
         a, f, _, c = solve(base, dd)
         with torch.no_grad():
@@ -293,7 +294,11 @@ if __name__ == "__main__":
 
     # --- short RL comparison
     print("\nRL from the base policy, mean of 2 seeds (train accuracy, last 10 iterations):")
-    for mode in ["outcome", "prime"]:
-        curves = [rl(base, mode, seed=s) for s in range(2)]
-        print(f"  {mode:8s} (RLOO {'outcome only' if mode == 'outcome' else '+ implicit process rewards'}): "
-              f"{sum(sum(c[-10:]) / 10 for c in curves) / 2:.3f}")
+    runs = {"outcome-only RLOO": dict(mode="outcome"),
+            "PRIME-style, phi from ref, proc_coef 0.2": dict(mode="prime"),
+            "PRIME-style, warmed-up phi, proc_coef 0.2": dict(mode="prime", phi_init=phi),
+            "PRIME-style, warmed-up phi, proc_coef 1.0": dict(mode="prime", phi_init=phi, proc_coef=1.0)}
+    for name, kw in runs.items():
+        curves = [rl(base, seed=s, **kw) for s in range(2)]
+        print(f"  {name:44s} first10 {sum(sum(c[:10]) / 10 for c in curves) / 2:.3f} | "
+              f"last10 {sum(sum(c[-10:]) / 10 for c in curves) / 2:.3f}")
